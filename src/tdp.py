@@ -11,7 +11,7 @@ class Input:
         self.detectText = False
         self.detectForms = False
         self.detectTables = False
-
+        self.detectQueries = False
         self.isLocalDocument = False
         self.documentType = ""
 
@@ -30,10 +30,14 @@ class ImageProcessor:
     def __init__(self, inputParameters):
         ''' Constructor. '''
         self.inputParameters = inputParameters
-
+    
+    #todo modify to include queries. 
+    #todo: hardcode one query
     def _callTextract(self):
         textract = AwsHelper().getClient('textract', self.inputParameters.awsRegion)
-        if(not self.inputParameters.detectForms and not self.inputParameters.detectTables):
+        #not tables or forms
+        print("about to call textract")
+        if(not self.inputParameters.detectForms and not self.inputParameters.detectTables and not self.inputParameters.detectQueries):
             if(self.inputParameters.isLocalDocument):
                 with open(self.inputParameters.documentPath, 'rb') as document:
                     imageData = document.read()
@@ -50,18 +54,33 @@ class ImageProcessor:
                     }
                 )
         else:
+            #tables and forms
             features  = []
             if(self.inputParameters.detectTables):
                 features.append("TABLES")
             if(self.inputParameters.detectForms):
                 features.append("FORMS")
-
+            
+            #ls_dict = [{"Text": "What is the policy Number","Alias": "POLICY_NUMBER"},{"Text": "What is the member id","Alias": "Member_ID"}] 
             if(self.inputParameters.isLocalDocument):
                 with open(self.inputParameters.documentPath, 'rb') as document:
                     imageData = document.read()
                     imageBytes = bytearray(imageData)
-
-                response = textract.analyze_document(Document={'Bytes': imageBytes} , FeatureTypes=features)
+                 
+                if(self.inputParameters.detectQueries):
+                    features.append("QUERIES")
+                    print("queries detected")
+                    """response = textract.analyze_document(Document={'Bytes': imageBytes} , FeatureTypes=features, QueriesConfig={'Queries':[{
+                        "Text": "What is the policy number",
+                        "Alias": "POLICY_NUMBER"},{
+                        "Text": "What is the patient name",
+                        "Alias": "PATIENT_NAME"}
+                        ]})"""
+                    response = textract.analyze_document(Document={'Bytes': imageBytes} , FeatureTypes=features, QueriesConfig= {'Queries':self._loadQueries()})
+                    #response = textract.analyze_document(Document={'Bytes': imageBytes} , FeatureTypes=features, QueriesConfig= {'Queries': ls_dict})
+                    print("Creafted the request for queries")
+                else:   
+                    response = textract.analyze_document(Document={'Bytes': imageBytes} , FeatureTypes=features)
             else:
                 response = textract.analyze_document(
                     Document={
@@ -74,7 +93,23 @@ class ImageProcessor:
                 )
 
         return response
-
+        
+    def _loadQueries(self):
+        with open('../questions.txt') as f:
+            lines = f.readlines()
+            formattedQueries = ""
+            listOfQueries = []
+            for cntr in range(0,len(lines)):
+                #print(lines[cntr])
+                #queriesDic = {"Text":[],"Alias":[]}
+                queriesDic = {}
+                line = lines[cntr].split(',')
+                queriesDic["Text"] = line[1]
+                queriesDic["Alias"] = line[0]
+                #queriesDic["Text"].append( line[1])
+                #queriesDic["Alias"].append( line[0])
+                listOfQueries.append(queriesDic)
+        return listOfQueries
     def run(self):
         response = self._callTextract()
         return response
@@ -182,7 +217,7 @@ class PdfProcessor:
 
 class DocumentProcessor:
 
-    def __init__(self, bucketName, documentPath, awsRegion, detectText, detectForms, detectTables):
+    def __init__(self, bucketName, documentPath, awsRegion, detectText, detectForms, detectTables, detectQueries):
 
         ip = Input()
         if(bucketName):
@@ -197,6 +232,8 @@ class DocumentProcessor:
             ip.detectForms = detectForms
         if(detectTables):
             ip.detectTables = detectTables
+        if(detectQueries):
+            ip.detectQueries = detectQueries
 
         if(not ip.bucketName and not ip.documentPath):
             raise Exception("Document is required.")
@@ -217,7 +254,7 @@ class DocumentProcessor:
         if(ip.documentType == "PDF" and ip.isLocalDocument):
             raise Exception("PDF must be in S3 bucket.")
 
-        if(ip.detectText == False and ip.detectForms == False and ip.detectTables == False):
+        if(ip.detectText == False and ip.detectForms == False and ip.detectTables == False and ip.detectQueries == False) :
             raise Exception("Select at least one option to extract text, form or table")
 
         self.inputParameters = ip

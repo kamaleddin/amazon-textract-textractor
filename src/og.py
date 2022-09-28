@@ -3,15 +3,17 @@ from tabulate import tabulate
 from helper import FileHelper
 from ta import TextAnalyzer, TextMedicalAnalyzer, TextTranslater
 from trp import *
+#from trp.trp2 import TDocument, TDocumentSchema
 
 
 class OutputGenerator:
-    def __init__(self, response, fileName, forms, tables):
+    def __init__(self, response, fileName, forms, tables, queries):
         self.response = response
         self.fileName = fileName
         self.forms = forms
         self.tables = tables
-
+        self.queries = queries
+        #Document is a TRP function (Textarct Response Parser)
         self.document = Document(self.response)
 
     def _outputWords(self, page, p):
@@ -28,7 +30,14 @@ class OutputGenerator:
         csvFieldNames = ['Word-Id', 'Word-Text']
         FileHelper.writeCSV("{}-page-{}-words.csv".format(self.fileName, p),
                             csvFieldNames, csvData)
-
+    
+    def _outputQuery(self, page, p):
+        print("OUtputQuery")
+        #d = TDocumentSchema().load(response)
+        #page = d.pages[0]
+        #query_answers = d.get_query_answers(page=page)
+        #print(tabulate(query_answers, tablefmt="github"))
+        #
     def _outputText(self, page, p):
         text = page.text
         FileHelper.writeToFile("{}-page-{}-text.txt".format(self.fileName, p),
@@ -118,7 +127,8 @@ class OutputGenerator:
             if (self.tables):
                 self._outputTable(page, p)
                 self._outputTablePretty(page, p)
-
+            if (self.queries):
+                self._outputQuery(page,p)
             p = p + 1
 
     def _insights(self, start, subText, sentiment, syntax, entities,

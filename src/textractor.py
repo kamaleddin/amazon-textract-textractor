@@ -27,6 +27,8 @@ class Textractor:
                     event['tables'] = True
                 if(args[i] == '--insights'):
                     event['insights'] = True
+                if(args[i] == '--queries'):
+                    event['queries'] = True
                 if(args[i] == '--medical-insights'):
                     event['medical-insights'] = True
                 if(args[i] == '--translate'):
@@ -83,6 +85,7 @@ class Textractor:
         ips["tables"] = ('tables' in event)
         ips["insights"] = ('insights' in event)
         ips["medical-insights"] = ('medical-insights' in event)
+        ips["queries"] = ('queries' in event)
         if("translate" in event):
             ips["translate"] = event["translate"]
         else:
@@ -95,7 +98,7 @@ class Textractor:
         print('=' * (len(document)+30))
 
         # Get document textracted
-        dp = DocumentProcessor(ips["bucketName"], document, ips["awsRegion"], ips["text"], ips["forms"], ips["tables"])
+        dp = DocumentProcessor(ips["bucketName"], document, ips["awsRegion"], ips["text"], ips["forms"], ips["tables"], ips["queries"])
         response = dp.run()
 
         if(response):
@@ -107,12 +110,12 @@ class Textractor:
             name, ext = FileHelper.getFileNameAndExtension(document)
             opg = OutputGenerator(response,
                         "{}-{}".format(name, ext),
-                        ips["forms"], ips["tables"])
+                        ips["forms"], ips["tables"],ips["queries"])
             opg.run()
 
             if(ips["insights"] or ips["medical-insights"] or ips["translate"]):
                 opg.generateInsights(ips["insights"], ips["medical-insights"], ips["translate"], ips["awsRegion"])
-
+            #todo: create output for queries
             print("{} textracted successfully.".format(document))
         else:
             print("Could not generate output for {}.".format(document))
@@ -124,9 +127,44 @@ class Textractor:
         print('- python3 textractor.py --documents ./myfolder/ --text --forms --tables')
         print('- python3 textractor.py --documents s3://mybucket/mydoc.pdf --text --forms --tables')
         print('- python3 textractor.py --documents s3://mybucket/ --text --forms --tables')
-
+    
+    #for testing only. remove later
+    '''def _loadQueries(self):   
+       with open('../questions.txt') as f:
+            lines = f.readlines()
+            formattedQueries = ""
+            for cntr in range(0,len(lines)):
+                #print(lines[cntr])
+                line = lines[cntr].split(',')
+                if cntr == (len(lines) - 1 ):
+                    formattedQueries += '{\"Text\": '+ line[1] + ',' + '\"Alias\": ' + line[0] + '}'
+                else:
+                    formattedQueries += '{\"Text\": '+ line[1] + ',' + '\"Alias\": ' + line[0] + '},'
+            #print(formattedQueries)
+            return formattedQueries'''
+    def _loadQueries(self):
+        with open('../questions.txt') as f:
+            lines = f.readlines()
+            formattedQueries = ""
+            listOfQueries = []
+            for cntr in range(0,len(lines)):
+                #print(lines[cntr])
+                #queriesDic = {"Text":[],"Alias":[]}
+                queriesDic = {}
+                line = lines[cntr].split(',')
+                queriesDic["Text"] = line[1]
+                queriesDic["Alias"] = line[0]
+                #queriesDic["Text"].append( line[1])
+                #queriesDic["Alias"].append( line[0])
+                
+                listOfQueries.append(queriesDic)
+                #if cntr == (len(lines) - 1 ):
+                #    formattedQueries += '{\"Text\": '+ line[0] + ',' + '\"Alias\": ' + line[1] + '}'
+                #else:
+                #    formattedQueries += '{\"Text\": '+ line[0] + ',' + '\"Alias\": ' + line[1] + '},'                    
+            print(listOfQueries)
+       
     def run(self):
-
         ips = None
         try:
             ips = self.validateInput(sys.argv)
@@ -164,4 +202,6 @@ class Textractor:
         #except Exception as e:
         #    print("Something went wrong:\n====================================================\n{}".format(e))
 
+#print('{}'.format(Textractor()._loadQueries()))
+#print(Textractor()._loadQueries())
 Textractor().run()
